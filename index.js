@@ -35,15 +35,15 @@ async function run() {
       "Pinged your deployment. You successfully connected to MongoDB!",
     );
 
+    const database = client.db("cookly");
+    const usersCollection = database.collection("user");
+    const recipesCollection = database.collection("recipes");
 
+    const favoritesCollection = database.collection("favorites");
+    const reportsCollection = database.collection("reports");
+    //
 
-       const database = client.db("cookly");
-       const usersCollection = database.collection("user");
-       const recipesCollection = database.collection("recipes");
-// 
-
-
-// Add a new recipe
+    // Add a new recipe
     //    app.post("/api/recipes", async (req, res) => {
     //      try {
     //        const recipe = req.body;
@@ -55,23 +55,21 @@ async function run() {
     //      }
     //    });
 
-
-
-       app.get("/auth/users",(req,res)=>{
-
-        const query = {};
-        if(req.query.email){
-          query.email = req.query.email;
-        }   
-        usersCollection.findOne(query)
-        .then(result => {
+    app.get("/auth/users", (req, res) => {
+      const query = {};
+      if (req.query.email) {
+        query.email = req.query.email;
+      }
+      usersCollection
+        .findOne(query)
+        .then((result) => {
           res.json(result);
         })
-        .catch(error => {
+        .catch((error) => {
           console.error("Error fetching user:", error);
           res.status(500).json({ error: "Internal Server Error" });
-        });     
-       })
+        });
+    });
     //    app.get("/api/recipes", async (req, res) => {
     //      try {
     //        const cursor = recipesCollection.find({});
@@ -82,14 +80,14 @@ async function run() {
     //        res.status(500).json({ error: "Internal Server Error" });
     //      }
     //    });
-    
-    // Job Details
-    // app.get("/jobs/:id", async (req, res) => {
+
+    // Recipe Details
+    // app.get("/recipes/:id", async (req, res) => {
     //   const id = req.params.id;
     //   const query = {
     //     _id: new ObjectId(id),
     //   };
-    //   const result = await jobsCollection.findOne(query);
+    //   const result = await recipesCollection.findOne(query);
     //   res.send(result);
     // });
 
@@ -99,8 +97,8 @@ async function run() {
         const recipe = req.body;
 
         const newRecipe = {
-            ...recipe,
-            createdAt: new Date(),
+          ...recipe,
+          createdAt: new Date(),
         };
 
         console.log("Inserting Recipe:", newRecipe);
@@ -120,8 +118,7 @@ async function run() {
       }
     });
 
-
-         // GET: Fetch all jobs with optional filtering
+    // GET: Fetch all recipes with optional filtering
     app.get("/api/recipes", async (req, res) => {
       try {
         const query = {};
@@ -139,6 +136,225 @@ async function run() {
         res.status(500).send({ success: false, message: error.message });
       }
     });
+
+
+    app.get("/api/recipes/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const recipe = await recipesCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send(recipe);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+
+
+
+// favorite recipes
+app.post("/api/favorites", async (req, res) => {
+  try {
+    const favoriteData = req.body;
+
+    const alreadyExist = await favoritesCollection.findOne({
+      userId: favoriteData.userId,
+      recipeId: favoriteData.recipeId,
+    });
+
+    if (alreadyExist) {
+      return res.send({
+        success: false,
+        message: "Already Added",
+      });
+    }
+
+    const result = await favoritesCollection.insertOne({
+      ...favoriteData,
+      addedAt: new Date(),
+    });
+
+    res.send({
+      success: true,
+      message: "Added To Favorites",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+// Get Favorite Recipes
+app.post("/api/favorites", async (req, res) => {
+  try {
+    const favoriteData = req.body;
+
+    const alreadyExist = await favoritesCollection.findOne({
+      userId: favoriteData.userId,
+      recipeId: favoriteData.recipeId,
+    });
+
+    if (alreadyExist) {
+      return res.send({
+        success: false,
+        message: "Already Added",
+      });
+    }
+
+    const result = await favoritesCollection.insertOne({
+      ...favoriteData,
+      addedAt: new Date(),
+    });
+
+    res.send({
+      success: true,
+      message: "Added To Favorites",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+// Delete Favorite Recipe
+app.delete("/api/favorites/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result = await favoritesCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+// Reportt  
+app.post("/api/reports", async (req, res) => {
+  try {
+    const report = req.body;
+
+    const result = await reportsCollection.insertOne({
+      ...report,
+      status: "pending",
+      createdAt: new Date(),
+    });
+
+    res.send({
+      success: true,
+      message: "Report Submitted",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+// get all reports
+
+app.get("/api/reports", async (req, res) => {
+  try {
+    const result = await reportsCollection
+      .find({})
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+// Like a Recipe
+// app.patch("/api/recipes/like/:id", async (req, res) => {
+//   try {
+//     const id = req.params.id;
+
+//     const result = await recipesCollection.updateOne(
+//       {
+//         _id: new ObjectId(id),
+//       },
+//       {
+//         $inc: {
+//           likesCount: 1,
+//         },
+//       }
+//     );
+
+//     res.send({
+//       success: true,
+//       message: "Recipe Liked",
+//       result,
+//     });
+//   } catch (error) {
+//     res.status(500).send({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   } finally {
     // Ensures that the client will close when you finish/error
