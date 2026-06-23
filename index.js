@@ -41,6 +41,8 @@ async function run() {
 
     const favoritesCollection = database.collection("favorites");
     const reportsCollection = database.collection("reports");
+    const plansCollection = database.collection("plans");
+    const subscriptionsCollection = database.collection("subscriptions");
     //
 
     // Add a new recipe
@@ -154,6 +156,21 @@ async function run() {
     });
   }
 });
+
+
+
+
+// Get Plans Limitation
+    app.get("/api/plans", async (req, res) => {
+      const query = {};
+      if (req.query.Plan_id) {
+        query._id = new ObjectId(req.query.Plan_id);
+      }
+
+      const plan = await plansCollection.findOne(query);
+      res.send(plan);
+    });
+
 
 
 
@@ -317,7 +334,7 @@ app.patch("/api/recipes/like/:id", async (req, res) => {
     });
 
 
-    
+
   } catch (error) {
     res.status(500).send({
       success: false,
