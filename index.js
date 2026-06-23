@@ -295,33 +295,36 @@ app.get("/api/reports", async (req, res) => {
 });
 
 // Like a Recipe
-// app.patch("/api/recipes/like/:id", async (req, res) => {
-//   try {
-//     const id = req.params.id;
+app.patch("/api/recipes/like/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
-//     const result = await recipesCollection.updateOne(
-//       {
-//         _id: new ObjectId(id),
-//       },
-//       {
-//         $inc: {
-//           likesCount: 1,
-//         },
-//       }
-//     );
+    const result = await recipesCollection.updateOne(
+      {
+        _id: new ObjectId(id),
+      },
+      {
+        $inc: {
+          likesCount: 1,
+        },
+      }
+    );
 
-//     res.send({
-//       success: true,
-//       message: "Recipe Liked",
-//       result,
-//     });
-//   } catch (error) {
-//     res.status(500).send({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// });
+    res.send({
+      success: true,
+      message: "Recipe Liked",
+      result,
+    });
+
+
+    
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 
 
