@@ -273,7 +273,7 @@ app.delete("/api/favorites/:id", async (req, res) => {
 });
 
 // Reportt  
-app.post("/api/reports", async (req, res) => {
+app.post("/api/recipe/reports", async (req, res) => {
   try {
     const report = req.body;
 
@@ -299,7 +299,7 @@ app.post("/api/reports", async (req, res) => {
 
 // get all reports
 
-app.get("/api/reports", async (req, res) => {
+app.get("/api/recipe/reports", async (req, res) => {
   try {
     const result = await reportsCollection
       .find({})
