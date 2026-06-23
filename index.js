@@ -45,6 +45,9 @@ async function run() {
     const subscriptionsCollection = database.collection("subscriptions");
     //
 
+
+
+ 
     // Add a new recipe
     //    app.post("/api/recipes", async (req, res) => {
     //      try {
@@ -159,18 +162,18 @@ async function run() {
 
 
 
+// /api/plans?plan_id=${planId}
+// // Get Plans Limitation
 
-// Get Plans Limitation
     app.get("/api/plans", async (req, res) => {
       const query = {};
-      if (req.query.Plan_id) {
-        query._id = new ObjectId(req.query.Plan_id);
+      if (req.query.plan_id) {
+        query.id = req.query.plan_id;
       }
 
       const plan = await plansCollection.findOne(query);
       res.send(plan);
     });
-
 
 
 
@@ -213,7 +216,7 @@ app.post("/api/favorites", async (req, res) => {
 
 
 // Get Favorite Recipes
-app.post("/api/favorites", async (req, res) => {
+app.post("/api/recipe/favorites", async (req, res) => {
   try {
     const favoriteData = req.body;
 
@@ -312,7 +315,7 @@ app.get("/api/reports", async (req, res) => {
 });
 
 // Like a Recipe
-app.patch("/api/recipes/like/:id", async (req, res) => {
+app.patch("/api/recipes/:id", async (req, res) => {
   try {
     const id = req.params.id;
 
@@ -330,11 +333,7 @@ app.patch("/api/recipes/like/:id", async (req, res) => {
     res.send({
       success: true,
       message: "Recipe Liked",
-      result,
     });
-
-
-
   } catch (error) {
     res.status(500).send({
       success: false,
@@ -355,6 +354,32 @@ app.patch("/api/recipes/like/:id", async (req, res) => {
 
 
 
+  // subscriptionss
+    app.post("/api/subscriptions", async (req, res) => {
+      const data = req.body;
+
+      console.log(data,"dataa");
+      const subsInfo = {
+        ...data,
+        createAt: new Date(),
+      };
+
+      const result = await subscriptionsCollection.insertOne(subsInfo);
+
+
+      // Update the user plane 
+
+      const filter = {email : data.email}
+      const updateDocunent = {
+        $set :{
+          plan : data.planId
+        }
+      }
+
+      const updateResult = await usersCollection.updateOne(filter,updateDocunent)
+
+      res.send(updateResult)
+    });
 
 
 
