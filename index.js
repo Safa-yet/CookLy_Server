@@ -124,6 +124,37 @@ async function run() {
       }
     });
 
+
+// Update recipe  
+    app.patch("/api/recipes/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result =
+      await recipesCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: req.body,
+        }
+      );
+
+    res.send({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+
+
     // GET: Fetch all recipes with optional filtering
     app.get("/api/recipes", async (req, res) => {
       try {
@@ -405,14 +436,81 @@ app.patch("/api/recipes/:id", async (req, res) => {
 
 
 
+// get User For admin
+app.get("/api/manage_users", async (req, res) => {
+  try {
+    const result = await usersCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+// Block User 
+app.patch("/api/manage_users/block/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
+    const result =
+      await usersCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            isBlocked: true,
+          },
+        }
+      );
+console.log(result,"block skfdgsk");
+    res.send({
+      success: true,
+      message: "User Blocked",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
+// Unblock user 
+app.patch("/api/manage_users/unblock/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
 
+    const result =
+      await usersCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            isBlocked: false,
+          },
+        }
+      );
 
-
-
-
+    res.send({
+      success: true,
+      message: "User Unblocked",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 
 
