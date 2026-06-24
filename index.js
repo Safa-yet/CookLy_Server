@@ -73,6 +73,37 @@ async function run() {
           res.status(500).json({ error: "Internal Server Error" });
         });
     });
+
+    app.patch("/api/users/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const { name, image } = req.body;
+
+        const result = await usersCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              name,
+              image,
+              updatedAt: new Date(),
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
     //    app.get("/api/recipes", async (req, res) => {
     //      try {
     //        const cursor = recipesCollection.find({});
@@ -190,9 +221,6 @@ async function run() {
       }
     });
 
-
-
-    
     app.get("/api/recipes/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -223,42 +251,26 @@ async function run() {
       res.send(plan);
     });
 
-    // favorite recipes
-    app.post("/api/favorites", async (req, res) => {
+    // Get Favorite Recipes
+
+    app.get("/api/recipe/favorites", async (req, res) => {
       try {
-        const favoriteData = req.body;
+        const query = {};
 
-        const alreadyExist = await favoritesCollection.findOne({
-          userId: favoriteData.userId,
-          recipeId: favoriteData.recipeId,
-        });
-
-        if (alreadyExist) {
-          return res.send({
-            success: false,
-            message: "Already Added",
-          });
+        if (req.query.authorId) {
+          query.authorId = req.query.authorId;
         }
 
-        const result = await favoritesCollection.insertOne({
-          ...favoriteData,
-          addedAt: new Date(),
-        });
+        const result = await favoritesCollection.find(query).toArray();
 
-        res.send({
-          success: true,
-          message: "Added To Favorites",
-          result,
-        });
+        res.send(result);
       } catch (error) {
         res.status(500).send({
           success: false,
-          message: error.message,
         });
       }
     });
 
-    // Get Favorite Recipes
     app.post("/api/recipe/favorites", async (req, res) => {
       try {
         const favoriteData = req.body;
@@ -294,7 +306,7 @@ async function run() {
     });
 
     // Delete Favorite Recipe
-    app.delete("/api/favorites/:id", async (req, res) => {
+    app.delete("/api/recipe/favorites/:id", async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -394,6 +406,31 @@ async function run() {
       const result = await recipePaymentsCollection.insertOne(subsInfo);
 
       res.send(result);
+    });
+
+    // Get Recip payment
+    // Get Purchased Recipes By User
+
+    app.get("/api/recipePayments", async (req, res) => {
+      try {
+        const query = {};
+
+        if (req.query.userId) {
+          query.userId = req.query.userId;
+        }
+
+        const result = await recipePaymentsCollection
+          .find(query)
+          .sort({ paidAt: -1 })
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
 
     // subscriptionss
