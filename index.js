@@ -46,9 +46,6 @@ async function run() {
     const recipePaymentsCollection = database.collection("recipePayments");
     //
 
-
-
- 
     // Add a new recipe
     //    app.post("/api/recipes", async (req, res) => {
     //      try {
@@ -124,36 +121,55 @@ async function run() {
       }
     });
 
-
-// Update recipe  
+    // Update recipe
     app.patch("/api/recipes/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
+      try {
+        const id = req.params.id;
 
-    const result =
-      await recipesCollection.updateOne(
-        {
+        const result = await recipesCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: req.body,
+          },
+        );
+
+        console.log(result, "resultgfisdgfiuasdfigsdiuf");
+
+        res.send({
+          success: true,
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
+    // Delete Recipeeee
+    app.delete("/api/recipes/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const result = await recipesCollection.deleteOne({
           _id: new ObjectId(id),
-        },
-        {
-          $set: req.body,
-        }
-      );
+        });
 
-    res.send({
-      success: true,
-      result,
+        res.send({
+          success: true,
+          message: "Recipe Deleted",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-
 
     // GET: Fetch all recipes with optional filtering
     app.get("/api/recipes", async (req, res) => {
@@ -175,27 +191,27 @@ async function run() {
     });
 
 
+
+    
     app.get("/api/recipes/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
+      try {
+        const id = req.params.id;
 
-    const recipe = await recipesCollection.findOne({
-      _id: new ObjectId(id),
+        const recipe = await recipesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send(recipe);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
 
-    res.send(recipe);
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-
-// /api/plans?plan_id=${planId}
-// // Get Plans Limitation
+    // /api/plans?plan_id=${planId}
+    // // Get Plans Limitation
 
     app.get("/api/plans", async (req, res) => {
       const query = {};
@@ -207,182 +223,169 @@ async function run() {
       res.send(plan);
     });
 
+    // favorite recipes
+    app.post("/api/favorites", async (req, res) => {
+      try {
+        const favoriteData = req.body;
 
+        const alreadyExist = await favoritesCollection.findOne({
+          userId: favoriteData.userId,
+          recipeId: favoriteData.recipeId,
+        });
 
+        if (alreadyExist) {
+          return res.send({
+            success: false,
+            message: "Already Added",
+          });
+        }
 
+        const result = await favoritesCollection.insertOne({
+          ...favoriteData,
+          addedAt: new Date(),
+        });
 
-// favorite recipes
-app.post("/api/favorites", async (req, res) => {
-  try {
-    const favoriteData = req.body;
-
-    const alreadyExist = await favoritesCollection.findOne({
-      userId: favoriteData.userId,
-      recipeId: favoriteData.recipeId,
-    });
-
-    if (alreadyExist) {
-      return res.send({
-        success: false,
-        message: "Already Added",
-      });
-    }
-
-    const result = await favoritesCollection.insertOne({
-      ...favoriteData,
-      addedAt: new Date(),
-    });
-
-    res.send({
-      success: true,
-      message: "Added To Favorites",
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-// Get Favorite Recipes
-app.post("/api/recipe/favorites", async (req, res) => {
-  try {
-    const favoriteData = req.body;
-
-    const alreadyExist = await favoritesCollection.findOne({
-      userId: favoriteData.userId,
-      recipeId: favoriteData.recipeId,
-    });
-
-    if (alreadyExist) {
-      return res.send({
-        success: false,
-        message: "Already Added",
-      });
-    }
-
-    const result = await favoritesCollection.insertOne({
-      ...favoriteData,
-      addedAt: new Date(),
-    });
-
-    res.send({
-      success: true,
-      message: "Added To Favorites",
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-// Delete Favorite Recipe
-app.delete("/api/favorites/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result = await favoritesCollection.deleteOne({
-      _id: new ObjectId(id),
-    });
-
-    res.send({
-      success: true,
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-// Reportt  
-app.post("/api/recipe/reports", async (req, res) => {
-  try {
-    const report = req.body;
-
-    const result = await reportsCollection.insertOne({
-      ...report,
-      status: "pending",
-      createdAt: new Date(),
-    });
-
-    res.send({
-      success: true,
-      message: "Report Submitted",
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-// get all reports
-
-app.get("/api/recipe/reports", async (req, res) => {
-  try {
-    const result = await reportsCollection
-      .find({})
-      .toArray();
-
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-// Like a Recipe
-app.patch("/api/recipes/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result = await recipesCollection.updateOne(
-      {
-        _id: new ObjectId(id),
-      },
-      {
-        $inc: {
-          likesCount: 1,
-        },
+        res.send({
+          success: true,
+          message: "Added To Favorites",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
       }
-    );
-
-    res.send({
-      success: true,
-      message: "Recipe Liked",
     });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
+
+    // Get Favorite Recipes
+    app.post("/api/recipe/favorites", async (req, res) => {
+      try {
+        const favoriteData = req.body;
+
+        const alreadyExist = await favoritesCollection.findOne({
+          userId: favoriteData.userId,
+          recipeId: favoriteData.recipeId,
+        });
+
+        if (alreadyExist) {
+          return res.send({
+            success: false,
+            message: "Already Added",
+          });
+        }
+
+        const result = await favoritesCollection.insertOne({
+          ...favoriteData,
+          addedAt: new Date(),
+        });
+
+        res.send({
+          success: true,
+          message: "Added To Favorites",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  }
-});
 
+    // Delete Favorite Recipe
+    app.delete("/api/favorites/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
 
+        const result = await favoritesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
 
+        res.send({
+          success: true,
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
 
+    // Reportt
+    app.post("/api/recipe/reports", async (req, res) => {
+      try {
+        const report = req.body;
 
-// Recipet pyment collection
+        const result = await reportsCollection.insertOne({
+          ...report,
+          status: "pending",
+          createdAt: new Date(),
+        });
+
+        res.send({
+          success: true,
+          message: "Report Submitted",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
+    // get all reports
+
+    app.get("/api/recipe/reports", async (req, res) => {
+      try {
+        const result = await reportsCollection.find({}).toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
+    // Like a Recipe
+    app.patch("/api/recipes/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const result = await recipesCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $inc: {
+              likesCount: 1,
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          message: "Recipe Liked",
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
+    // Recipet pyment collection
     app.post("/api/recipePayments", async (req, res) => {
       const data = req.body;
 
-      console.log(data,"dataa");
+      console.log(data, "dataa");
       const subsInfo = {
         ...data,
         paidAt: new Date(),
@@ -390,26 +393,14 @@ app.patch("/api/recipes/:id", async (req, res) => {
 
       const result = await recipePaymentsCollection.insertOne(subsInfo);
 
-
-
-      res.send(result)
+      res.send(result);
     });
 
-
-
-
-
-
-
-
-
-
-
-  // subscriptionss
+    // subscriptionss
     app.post("/api/subscriptions", async (req, res) => {
       const data = req.body;
 
-      console.log(data,"dataa");
+      console.log(data, "dataa");
       const subsInfo = {
         ...data,
         createAt: new Date(),
@@ -417,108 +408,96 @@ app.patch("/api/recipes/:id", async (req, res) => {
 
       const result = await subscriptionsCollection.insertOne(subsInfo);
 
+      // Update the user plane
 
-      // Update the user plane 
-
-      const filter = {email : data.email}
+      const filter = { email: data.email };
       const updateDocunent = {
-        $set :{
-          plan : data.planId
-        }
+        $set: {
+          plan: data.planId,
+        },
+      };
+
+      const updateResult = await usersCollection.updateOne(
+        filter,
+        updateDocunent,
+      );
+
+      res.send(updateResult);
+    });
+
+    // get User For admin
+    app.get("/api/manage_users", async (req, res) => {
+      try {
+        const result = await usersCollection
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
       }
-
-      const updateResult = await usersCollection.updateOne(filter,updateDocunent)
-
-      res.send(updateResult)
     });
+    // Block User
+    app.patch("/api/manage_users/block/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
 
-
-
-
-
-// get User For admin
-app.get("/api/manage_users", async (req, res) => {
-  try {
-    const result = await usersCollection
-      .find({})
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-// Block User 
-app.patch("/api/manage_users/block/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result =
-      await usersCollection.updateOne(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            isBlocked: true,
+        const result = await usersCollection.updateOne(
+          {
+            _id: new ObjectId(id),
           },
-        }
-      );
-console.log(result,"block skfdgsk");
-    res.send({
-      success: true,
-      message: "User Blocked",
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-// Unblock user 
-app.patch("/api/manage_users/unblock/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result =
-      await usersCollection.updateOne(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            isBlocked: false,
+          {
+            $set: {
+              isBlocked: true,
+            },
           },
-        }
-      );
-
-    res.send({
-      success: true,
-      message: "User Unblocked",
-      result,
+        );
+        console.log(result, "block skfdgsk");
+        res.send({
+          success: true,
+          message: "User Blocked",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
+
+    // Unblock user
+    app.patch("/api/manage_users/unblock/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const result = await usersCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              isBlocked: false,
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          message: "User Unblocked",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  }
-});
-
-
-
-
-
-
-
-
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
