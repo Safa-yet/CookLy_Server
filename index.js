@@ -43,6 +43,7 @@ async function run() {
     const reportsCollection = database.collection("reports");
     const plansCollection = database.collection("plans");
     const subscriptionsCollection = database.collection("subscriptions");
+    const recipePaymentsCollection = database.collection("recipePayments");
     //
 
 
@@ -343,6 +344,25 @@ app.patch("/api/recipes/:id", async (req, res) => {
 });
 
 
+
+
+
+// Recipet pyment collection
+    app.post("/api/recipePayments", async (req, res) => {
+      const data = req.body;
+
+      console.log(data,"dataa");
+      const subsInfo = {
+        ...data,
+        paidAt: new Date(),
+      };
+
+      const result = await recipePaymentsCollection.insertOne(subsInfo);
+
+
+
+      res.send(result)
+    });
 
 
 
