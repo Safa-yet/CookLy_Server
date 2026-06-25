@@ -721,6 +721,8 @@ app.patch("/api/manage_recipes/unfeature/:id", async (req, res) => {
       message: "Feature Removed",
       result,
     });
+
+
   } catch (error) {
     res.status(500).send({
       success: false,
@@ -731,6 +733,157 @@ app.patch("/api/manage_recipes/unfeature/:id", async (req, res) => {
 
 
 
+
+
+
+
+// All Transition for Admin
+app.get("/api/admin/transactions", async (req, res) => {
+  try {
+
+    // Subscription Payments
+    const subscriptions =
+      await subscriptionsCollection
+        .find({})
+        .toArray();
+
+    const subscriptionTransactions =
+      subscriptions.map((item) => ({
+        _id: item._id,
+
+        user: item.email,
+
+        amount:
+          item.priceId || 0,
+
+        date:
+          item.createAt,
+
+        status:
+          item.status ||
+          "succeeded",
+
+        transactionId:
+          item.transactionId ||
+          "N/A",
+
+        type: "Subscription",
+
+        plan:
+          item.planId,
+      }));
+
+    // Recipe Payments
+    const recipePayments =
+      await recipePaymentsCollection
+        .find({})
+        .toArray();
+
+    const recipeTransactions =
+      recipePayments.map(
+        (item) => ({
+          _id: item._id,
+
+          user:
+            item.UserEmail,
+
+          amount:
+            item.recipePrice,
+
+          date:
+            item.paidAt,
+
+          status:
+            item.status,
+
+          transactionId:
+            item.transactionId,
+
+          type:
+            "Recipe Purchase",
+
+          recipeName:
+            item.recipeName,
+        })
+      );
+
+    // Merge
+    const transactions = [
+      ...subscriptionTransactions,
+      ...recipeTransactions,
+    ];
+
+    // Latest First
+    transactions.sort(
+      (a, b) =>
+        new Date(b.date) -
+        new Date(a.date)
+    );
+
+    res.send(transactions);
+
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message:
+        error.message,
+    });
+  }
+});
+
+// Admin Dashboard
+app.get("/api/admin/dashboard", async (req, res) => {
+  try {
+
+    const totalUsers =
+      await usersCollection.countDocuments();
+
+    const totalRecipes =
+      await recipesCollection.countDocuments();
+
+    const totalReports =
+      await reportsCollection.countDocuments();
+
+    const totalPremiumMembers =
+      await usersCollection.countDocuments({
+        plan: {
+          $in: [
+            "user_pro",
+            "user_premium",
+          ],
+        },
+      });
+
+    const featuredRecipes =
+      await recipesCollection.countDocuments({
+        isFeatured: true,
+      });
+
+    const blockedUsers =
+      await usersCollection.countDocuments({
+        isBlocked: true,
+      });
+
+    const totalPurchases =
+      await recipePaymentsCollection.countDocuments();
+
+    res.send({
+      totalUsers,
+      totalRecipes,
+      totalReports,
+      totalPremiumMembers,
+      featuredRecipes,
+      blockedUsers,
+      totalPurchases,
+    });
+
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 
 
