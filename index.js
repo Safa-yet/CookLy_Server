@@ -366,7 +366,7 @@ async function run() {
     });
 
     // Like a Recipe
-    app.patch("/api/recipes/:id", async (req, res) => {
+    app.patch("/api/recipe/like/:id", async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -532,6 +532,50 @@ async function run() {
         res.status(500).send({
           success: false,
           message: error.message,
+        });
+      }
+    });
+
+    app.get("/api/dashboard/stats/:userId", async (req, res) => {
+      try {
+        const { userId } = req.params;
+
+        const recipes = await recipesCollection
+          .find({
+            authorId: userId,
+          })
+          .toArray();
+
+        const totalRecipes = recipes.length;
+
+        const totalFavorites = await favoritesCollection.countDocuments({
+          authorId: userId,
+        });
+
+        const totalPurchased = await recipePaymentsCollection.countDocuments({
+          userId,
+        });
+
+        const totalLikesReceived = recipes.reduce(
+          (sum, recipe) => sum + (recipe.likesCount || 0),
+          0,
+        );
+
+        const mostLikedRecipe =
+          recipes.sort(
+            (a, b) => (b.likesCount || 0) - (a.likesCount || 0),
+          )[0] || null;
+
+        res.send({
+          totalRecipes,
+          totalFavorites,
+          totalPurchased,
+          totalLikesReceived,
+          mostLikedRecipe,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
         });
       }
     });
