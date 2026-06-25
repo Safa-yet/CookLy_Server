@@ -352,18 +352,100 @@ async function run() {
 
     // get all reports
 
-    app.get("/api/recipe/reports", async (req, res) => {
-      try {
-        const result = await reportsCollection.find({}).toArray();
+app.get("/api/admin/reports", async (req, res) => {
+  try {
+    const result = await reportsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({
-          success: false,
-          message: error.message,
-        });
-      }
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
     });
+  }
+});
+
+
+
+// Dismis Report 
+app.patch(
+  "/api/admin/reports/dismiss/:id",
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      const result =
+        await reportsCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              status: "dismissed",
+            },
+          }
+        );
+
+      res.send({
+        success: true,
+        message: "Report Dismissed",
+        result,
+      });
+    } catch (error) {
+      res.status(500).send({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+
+// Resolverd recipe & Delet from Report Collection
+app.delete(
+  "/api/admin/reports/remove-recipe/:reportId/:recipeId",
+  async (req, res) => {
+    try {
+      const { reportId, recipeId } =
+        req.params;
+
+      await recipesCollection.deleteOne({
+        _id: new ObjectId(recipeId),
+      });
+
+      await reportsCollection.updateOne(
+        {
+          _id: new ObjectId(reportId),
+        },
+        {
+          $set: {
+            status: "resolved",
+          },
+        }
+      );
+
+      res.send({
+        success: true,
+        message:
+          "Recipe Removed Successfully",
+      });
+    } catch (error) {
+      res.status(500).send({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+
+
+
+
+
 
     // Like a Recipe
     app.patch("/api/recipe/like/:id", async (req, res) => {
@@ -579,6 +661,80 @@ async function run() {
         });
       }
     });
+
+
+
+// Featured Trueeeeeee
+app.patch("/api/manage_recipes/feature/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result =
+      await recipesCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            isFeatured: true,
+          },
+        }
+      );
+
+    res.send({
+      success: true,
+      message: "Recipe Featured",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+
+
+// Featured False
+
+
+app.patch("/api/manage_recipes/unfeature/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result =
+      await recipesCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            isFeatured: false,
+          },
+        }
+      );
+
+    res.send({
+      success: true,
+      message: "Feature Removed",
+      result,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+
+
+
+
+
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
