@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 // const { createRemoteJWKSet } = require("jose-cjs");
 
 // 1. Load environment variables (First priority)
@@ -25,6 +26,41 @@ const client = new MongoClient(uri, {
   },
 });
 
+
+
+
+const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
+);
+
+const verifyToken = async(req,res,next)=>{
+  const authHeader = req.headers.authorization;
+
+  if(!authHeader || !authHeader.startsWith('Bearer')){
+    return res.status(401).json({message:'Unauthorized'})
+  }
+  const token = authHeader.split(' ')[1];
+  if(!token){
+    return res.status(401).json({message:'Unauthorized'})
+  }
+  try{
+const { payload } = await jwtVerify(token, JWKS)
+console.log('Token payload:', payload);
+next();
+  }
+  catch(error){
+    console.error('Token verification error:', error);
+    return res.status(401).json({message:'Unauthorized'})
+  }
+}
+
+
+
+
+
+
+
+
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -46,17 +82,6 @@ async function run() {
     const recipePaymentsCollection = database.collection("recipePayments");
     //
 
-    // Add a new recipe
-    //    app.post("/api/recipes", async (req, res) => {
-    //      try {
-    //        const recipe = req.body;
-    //        const result = await recipesCollection.insertOne(recipe);
-    //        res.status(201).json(result);
-    //      } catch (error) {
-    //        console.error("Error creating recipe:", error);
-    //        res.status(500).json({ error: "Internal Server Error" });
-    //      }
-    //    });
 
     app.get("/auth/users", (req, res) => {
       const query = {};
@@ -104,26 +129,7 @@ async function run() {
         });
       }
     });
-    //    app.get("/api/recipes", async (req, res) => {
-    //      try {
-    //        const cursor = recipesCollection.find({});
-    //        const result = await cursor.toArray();
-    //        res.json(result);
-    //      } catch (error) {
-    //        console.error("Error fetching recipes:", error);
-    //        res.status(500).json({ error: "Internal Server Error" });
-    //      }
-    //    });
 
-    // Recipe Details
-    // app.get("/recipes/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const query = {
-    //     _id: new ObjectId(id),
-    //   };
-    //   const result = await recipesCollection.findOne(query);
-    //   res.send(result);
-    // });
 
     // POST: Create a new Recipe post
     app.post("/api/recipes", async (req, res) => {
@@ -203,7 +209,7 @@ async function run() {
     });
 
     // GET: Fetch all recipes with optional filtering
-    app.get("/api/recipes", async (req, res) => {
+    app.get("/api/recipes",verifyToken, async (req, res) => {
       try {
         const query = {};
         if (req.query.authorId) {
@@ -221,7 +227,7 @@ async function run() {
       }
     });
 
-    app.get("/api/recipes/:id", async (req, res) => {
+    app.get("/api/recipes/:id",verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -271,7 +277,7 @@ async function run() {
       }
     });
 
-    app.post("/api/recipe/favorites", async (req, res) => {
+    app.post("/api/recipe/favorites", verifyToken, async (req, res) => {
       try {
         const favoriteData = req.body;
 
@@ -352,33 +358,28 @@ async function run() {
 
     // get all reports
 
-app.get("/api/admin/reports", async (req, res) => {
-  try {
-    const result = await reportsCollection
-      .find({})
-      .sort({ createdAt: -1 })
-      .toArray();
+    app.get("/api/admin/reports", async (req, res) => {
+      try {
+        const result = await reportsCollection
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
 
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  }
-});
 
+    // Dismis Report
+    app.patch("/api/admin/reports/dismiss/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
 
-
-// Dismis Report 
-app.patch(
-  "/api/admin/reports/dismiss/:id",
-  async (req, res) => {
-    try {
-      const id = req.params.id;
-
-      const result =
-        await reportsCollection.updateOne(
+        const result = await reportsCollection.updateOne(
           {
             _id: new ObjectId(id),
           },
@@ -386,66 +387,56 @@ app.patch(
             $set: {
               status: "dismissed",
             },
-          }
+          },
         );
 
-      res.send({
-        success: true,
-        message: "Report Dismissed",
-        result,
-      });
-    } catch (error) {
-      res.status(500).send({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
-);
+        res.send({
+          success: true,
+          message: "Report Dismissed",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
 
+    // Resolverd recipe & Delet from Report Collection
+    app.delete(
+      "/api/admin/reports/remove-recipe/:reportId/:recipeId",
+      async (req, res) => {
+        try {
+          const { reportId, recipeId } = req.params;
 
-// Resolverd recipe & Delet from Report Collection
-app.delete(
-  "/api/admin/reports/remove-recipe/:reportId/:recipeId",
-  async (req, res) => {
-    try {
-      const { reportId, recipeId } =
-        req.params;
+          await recipesCollection.deleteOne({
+            _id: new ObjectId(recipeId),
+          });
 
-      await recipesCollection.deleteOne({
-        _id: new ObjectId(recipeId),
-      });
+          await reportsCollection.updateOne(
+            {
+              _id: new ObjectId(reportId),
+            },
+            {
+              $set: {
+                status: "resolved",
+              },
+            },
+          );
 
-      await reportsCollection.updateOne(
-        {
-          _id: new ObjectId(reportId),
-        },
-        {
-          $set: {
-            status: "resolved",
-          },
+          res.send({
+            success: true,
+            message: "Recipe Removed Successfully",
+          });
+        } catch (error) {
+          res.status(500).send({
+            success: false,
+            message: error.message,
+          });
         }
-      );
-
-      res.send({
-        success: true,
-        message:
-          "Recipe Removed Successfully",
-      });
-    } catch (error) {
-      res.status(500).send({
-        success: false,
-        message: error.message,
-      });
-    }
-  }
-);
-
-
-
-
-
-
+      },
+    );
 
     // Like a Recipe
     app.patch("/api/recipe/like/:id", async (req, res) => {
@@ -662,232 +653,171 @@ app.delete(
       }
     });
 
+    // Featured Trueeeeeee
+    app.patch("/api/manage_recipes/feature/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
 
-
-// Featured Trueeeeeee
-app.patch("/api/manage_recipes/feature/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result =
-      await recipesCollection.updateOne(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            isFeatured: true,
+        const result = await recipesCollection.updateOne(
+          {
+            _id: new ObjectId(id),
           },
-        }
-      );
-
-    res.send({
-      success: true,
-      message: "Recipe Featured",
-      result,
-    });
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
-    });
-  }
-});
-
-
-
-
-// Featured False
-
-
-app.patch("/api/manage_recipes/unfeature/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const result =
-      await recipesCollection.updateOne(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            isFeatured: false,
+          {
+            $set: {
+              isFeatured: true,
+            },
           },
-        }
-      );
+        );
 
-    res.send({
-      success: true,
-      message: "Feature Removed",
-      result,
+        res.send({
+          success: true,
+          message: "Recipe Featured",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
 
+    // Featured False
 
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
+    app.patch("/api/manage_recipes/unfeature/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const result = await recipesCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              isFeatured: false,
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          message: "Feature Removed",
+          result,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  }
-});
 
+    // All Transition for Admin
+    app.get("/api/admin/transactions", async (req, res) => {
+      try {
+        // Subscription Payments
+        const subscriptions = await subscriptionsCollection.find({}).toArray();
 
-
-
-
-
-
-// All Transition for Admin
-app.get("/api/admin/transactions", async (req, res) => {
-  try {
-
-    // Subscription Payments
-    const subscriptions =
-      await subscriptionsCollection
-        .find({})
-        .toArray();
-
-    const subscriptionTransactions =
-      subscriptions.map((item) => ({
-        _id: item._id,
-
-        user: item.email,
-
-        amount:
-          item.priceId || 0,
-
-        date:
-          item.createAt,
-
-        status:
-          item.status ||
-          "succeeded",
-
-        transactionId:
-          item.transactionId ||
-          "N/A",
-
-        type: "Subscription",
-
-        plan:
-          item.planId,
-      }));
-
-    // Recipe Payments
-    const recipePayments =
-      await recipePaymentsCollection
-        .find({})
-        .toArray();
-
-    const recipeTransactions =
-      recipePayments.map(
-        (item) => ({
+        const subscriptionTransactions = subscriptions.map((item) => ({
           _id: item._id,
 
-          user:
-            item.UserEmail,
+          user: item.email,
 
-          amount:
-            item.recipePrice,
+          amount: item.priceId || 0,
 
-          date:
-            item.paidAt,
+          date: item.createAt,
 
-          status:
-            item.status,
+          status: item.status || "succeeded",
 
-          transactionId:
-            item.transactionId,
+          transactionId: item.transactionId || "N/A",
 
-          type:
-            "Recipe Purchase",
+          type: "Subscription",
 
-          recipeName:
-            item.recipeName,
-        })
-      );
+          plan: item.planId,
+        }));
 
-    // Merge
-    const transactions = [
-      ...subscriptionTransactions,
-      ...recipeTransactions,
-    ];
+        // Recipe Payments
+        const recipePayments = await recipePaymentsCollection
+          .find({})
+          .toArray();
 
-    // Latest First
-    transactions.sort(
-      (a, b) =>
-        new Date(b.date) -
-        new Date(a.date)
-    );
+        const recipeTransactions = recipePayments.map((item) => ({
+          _id: item._id,
 
-    res.send(transactions);
+          user: item.UserEmail,
 
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message:
-        error.message,
-    });
-  }
-});
+          amount: item.recipePrice,
 
-// Admin Dashboard
-app.get("/api/admin/dashboard", async (req, res) => {
-  try {
+          date: item.paidAt,
 
-    const totalUsers =
-      await usersCollection.countDocuments();
+          status: item.status,
 
-    const totalRecipes =
-      await recipesCollection.countDocuments();
+          transactionId: item.transactionId,
 
-    const totalReports =
-      await reportsCollection.countDocuments();
+          type: "Recipe Purchase",
 
-    const totalPremiumMembers =
-      await usersCollection.countDocuments({
-        plan: {
-          $in: [
-            "user_pro",
-            "user_premium",
-          ],
-        },
-      });
+          recipeName: item.recipeName,
+        }));
 
-    const featuredRecipes =
-      await recipesCollection.countDocuments({
-        isFeatured: true,
-      });
+        // Merge
+        const transactions = [
+          ...subscriptionTransactions,
+          ...recipeTransactions,
+        ];
 
-    const blockedUsers =
-      await usersCollection.countDocuments({
-        isBlocked: true,
-      });
+        // Latest First
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const totalPurchases =
-      await recipePaymentsCollection.countDocuments();
-
-    res.send({
-      totalUsers,
-      totalRecipes,
-      totalReports,
-      totalPremiumMembers,
-      featuredRecipes,
-      blockedUsers,
-      totalPurchases,
+        res.send(transactions);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
 
-  } catch (error) {
-    res.status(500).send({
-      success: false,
-      message: error.message,
+    // Admin Dashboard
+    app.get("/api/admin/dashboard", async (req, res) => {
+      try {
+        const totalUsers = await usersCollection.countDocuments();
+
+        const totalRecipes = await recipesCollection.countDocuments();
+
+        const totalReports = await reportsCollection.countDocuments();
+
+        const totalPremiumMembers = await usersCollection.countDocuments({
+          plan: {
+            $in: ["user_pro", "user_premium"],
+          },
+        });
+
+        const featuredRecipes = await recipesCollection.countDocuments({
+          isFeatured: true,
+        });
+
+        const blockedUsers = await usersCollection.countDocuments({
+          isBlocked: true,
+        });
+
+        const totalPurchases = await recipePaymentsCollection.countDocuments();
+
+        res.send({
+          totalUsers,
+          totalRecipes,
+          totalReports,
+          totalPremiumMembers,
+          featuredRecipes,
+          blockedUsers,
+          totalPurchases,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: error.message,
+        });
+      }
     });
-  }
-});
-
-
-
-
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
