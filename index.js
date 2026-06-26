@@ -26,40 +26,56 @@ const client = new MongoClient(uri, {
   },
 });
 
-
-
-
-const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
+const JWKS = createRemoteJWKSet(
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
 );
 
-const verifyToken = async(req,res,next)=>{
+const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if(!authHeader || !authHeader.startsWith('Bearer')){
-    return res.status(401).json({message:'Unauthorized'})
+  if (!authHeader || !authHeader.startsWith("Bearer")) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
-  const token = authHeader.split(' ')[1];
-  if(!token){
-    return res.status(401).json({message:'Unauthorized'})
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
-  try{
-const { payload } = await jwtVerify(token, JWKS)
-console.log('Token payload:', payload);
-next();
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    console.log("Token payload:", payload);
+    req.user = payload; // Attach the user information to the request object
+    next();
+  } catch (error) {
+    console.error("Token verification error:", error);
+    return res.status(401).json({ message: "Unauthorized" });
   }
-  catch(error){
-    console.error('Token verification error:', error);
-    return res.status(401).json({message:'Unauthorized'})
+};
+
+const adminVerify = async (req, res, next) => {
+  const user = req.user;
+
+  console.log(user, "adddminsaidhgfsudhf");
+  if (user && user.role === "admin") {
+    next();
+  } else {
+    return res.status(403).json({ message: "Forbidden" });
   }
-}
+};
 
+const verifyNotBlocked = async (req, res, next) => {
+  const user = req.user;
 
+  console.log(user, "userrr dataaa");
 
+  if (user?.isBlocked) {
+    return res.status(403).send({
+      success: false,
+      message: "Account Blocked",
+    });
+  }
 
-
-
-
-
+  next();
+};
 
 async function run() {
   try {
@@ -81,7 +97,6 @@ async function run() {
     const subscriptionsCollection = database.collection("subscriptions");
     const recipePaymentsCollection = database.collection("recipePayments");
     //
-
 
     app.get("/auth/users", (req, res) => {
       const query = {};
@@ -129,7 +144,6 @@ async function run() {
         });
       }
     });
-
 
     // POST: Create a new Recipe post
     app.post("/api/recipes", async (req, res) => {
@@ -209,7 +223,7 @@ async function run() {
     });
 
     // GET: Fetch all recipes with optional filtering
-    app.get("/api/recipes",verifyToken, async (req, res) => {
+    app.get("/api/recipes", verifyToken, verifyNotBlocked, async (req, res) => {
       try {
         const query = {};
         if (req.query.authorId) {
@@ -227,7 +241,31 @@ async function run() {
       }
     });
 
-    app.get("/api/recipes/:id",verifyToken, async (req, res) => {
+    // For Pagination and Filtering in Admin Dashboard
+    app.get("/api/admin/recipes", async (req, res) => {
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 5;
+
+      const skip = (page - 1) * limit;
+
+      const totalRecipes = await recipesCollection.countDocuments();
+
+      const recipes = await recipesCollection
+        .find({})
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      res.send({
+        recipes,
+        totalRecipes,
+        totalPages: Math.ceil(totalRecipes / limit),
+        currentPage: page,
+      });
+    });
+
+    app.get("/api/recipes/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -778,46 +816,52 @@ async function run() {
     });
 
     // Admin Dashboard
-    app.get("/api/admin/dashboard", async (req, res) => {
-      try {
-        const totalUsers = await usersCollection.countDocuments();
+    app.get(
+      "/api/admin/dashboard",
+      verifyToken,
+      adminVerify,
+      async (req, res) => {
+        try {
+          const totalUsers = await usersCollection.countDocuments();
 
-        const totalRecipes = await recipesCollection.countDocuments();
+          const totalRecipes = await recipesCollection.countDocuments();
 
-        const totalReports = await reportsCollection.countDocuments();
+          const totalReports = await reportsCollection.countDocuments();
 
-        const totalPremiumMembers = await usersCollection.countDocuments({
-          plan: {
-            $in: ["user_pro", "user_premium"],
-          },
-        });
+          const totalPremiumMembers = await usersCollection.countDocuments({
+            plan: {
+              $in: ["user_pro", "user_premium"],
+            },
+          });
 
-        const featuredRecipes = await recipesCollection.countDocuments({
-          isFeatured: true,
-        });
+          const featuredRecipes = await recipesCollection.countDocuments({
+            isFeatured: true,
+          });
 
-        const blockedUsers = await usersCollection.countDocuments({
-          isBlocked: true,
-        });
+          const blockedUsers = await usersCollection.countDocuments({
+            isBlocked: true,
+          });
 
-        const totalPurchases = await recipePaymentsCollection.countDocuments();
+          const totalPurchases =
+            await recipePaymentsCollection.countDocuments();
 
-        res.send({
-          totalUsers,
-          totalRecipes,
-          totalReports,
-          totalPremiumMembers,
-          featuredRecipes,
-          blockedUsers,
-          totalPurchases,
-        });
-      } catch (error) {
-        res.status(500).send({
-          success: false,
-          message: error.message,
-        });
-      }
-    });
+          res.send({
+            totalUsers,
+            totalRecipes,
+            totalReports,
+            totalPremiumMembers,
+            featuredRecipes,
+            blockedUsers,
+            totalPurchases,
+          });
+        } catch (error) {
+          res.status(500).send({
+            success: false,
+            message: error.message,
+          });
+        }
+      },
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
