@@ -61,6 +61,16 @@ const adminVerify = async (req, res, next) => {
     return res.status(403).json({ message: "Forbidden" });
   }
 };
+const userVerify = async (req, res, next) => {
+  const user = req.user;
+
+  console.log(user, "adddminsaidhgfsudhf");
+  if (user && user.role === "user") {
+    next();
+  } else {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+};
 
 const verifyNotBlocked = async (req, res, next) => {
   const user = req.user;
@@ -98,7 +108,7 @@ async function run() {
     const recipePaymentsCollection = database.collection("recipePayments");
     //
 
-    app.get("/auth/users", (req, res) => {
+    app.get("/auth/users",verifyToken,userVerify, (req, res) => {
       const query = {};
       if (req.query.email) {
         query.email = req.query.email;
@@ -114,7 +124,7 @@ async function run() {
         });
     });
 
-    app.patch("/api/users/:id", async (req, res) => {
+    app.patch("/api/users/:id",verifyToken,userVerify, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -146,7 +156,7 @@ async function run() {
     });
 
     // POST: Create a new Recipe post
-    app.post("/api/recipes", async (req, res) => {
+    app.post("/api/recipes",verifyToken,userVerify, async (req, res) => {
       try {
         const recipe = req.body;
 
@@ -223,26 +233,130 @@ async function run() {
     });
 
     // GET: Fetch all recipes with optional filtering
-    app.get("/api/recipes", verifyToken, verifyNotBlocked, async (req, res) => {
-      try {
-        const query = {};
-        if (req.query.authorId) {
-          query.authorId = req.query.authorId;
-        }
-        if (req.query.status) {
-          query.status = req.query.status;
-        }
+    // app.get("/api/recipes", async (req, res) => {
+    //   try {
+    //     const query = {};
+    //     if (req.query.authorId) {
+    //       query.authorId = req.query.authorId;
+    //     }
+    //     if (req.query.status) {
+    //       query.status = req.query.status;
+    //     }
 
-        const cursor = recipesCollection.find(query);
-        const result = await cursor.toArray();
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({ success: false, message: error.message });
-      }
+    //     const cursor = recipesCollection.find(query);
+    //     const result = await cursor.toArray();
+    //     res.send(result);
+    //   } catch (error) {
+    //     res.status(500).send({ success: false, message: error.message });
+    //   }
+    // });
+
+
+
+
+app.get("/api/recipes", async (req, res) => {
+  try {
+    const query = {};
+
+    if (req.query.authorId) {
+      query.authorId = req.query.authorId;
+    }
+
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+
+    if (req.query.search) {
+      query.recipeName = {
+        $regex: req.query.search,
+        $options: "i",
+      };
+    }
+
+    if (req.query.category) {
+      query.category = {
+        $in: req.query.category
+          .split(",")
+          .filter(Boolean),
+      };
+    }
+
+    const recipes = await recipesCollection
+      .find(query)
+      .sort({
+        createdAt: 1,
+      })
+      .toArray();
+
+    res.send(recipes);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
+// Featured recipes
+app.get("/api/featured-recipes", async (req, res) => {
+  try {
+
+    const recipes = await recipesCollection
+      .find({
+        isFeatured: true,
+        status: "active",
+      })
+      .sort({
+        createdAt: -1,
+      })
+      .limit(6)
+      .toArray();
+
+    res.send(recipes);
+
+  } catch (error) {
+
+    res.status(500).send({
+      success: false,
+      message: error.message,
     });
 
+  }
+});
+
+
+
+
+
+
+// Most Famous Recipe
+// Popular Recipes
+app.get("/api/popular-recipes", async (req, res) => {
+  try {
+    const recipes = await recipesCollection
+      .find({
+        status: "active",
+      })
+      .sort({
+        likesCount: -1,
+        createdAt: -1,
+      })
+      .limit(6)
+      .toArray();
+
+    res.send(recipes);
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+
     // For Pagination and Filtering in Admin Dashboard
-    app.get("/api/admin/recipes", async (req, res) => {
+    app.get("/api/admin/recipes",verifyToken,adminVerify, async (req, res) => {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 5;
 
@@ -265,7 +379,7 @@ async function run() {
       });
     });
 
-    app.get("/api/recipes/:id", verifyToken, async (req, res) => {
+    app.get("/api/recipes/:id", async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -297,7 +411,7 @@ async function run() {
 
     // Get Favorite Recipes
 
-    app.get("/api/recipe/favorites", async (req, res) => {
+    app.get("/api/recipe/favorites",verifyToken,userVerify, async (req, res) => {
       try {
         const query = {};
 
@@ -315,7 +429,7 @@ async function run() {
       }
     });
 
-    app.post("/api/recipe/favorites", verifyToken, async (req, res) => {
+    app.post("/api/recipe/favorites", async (req, res) => {
       try {
         const favoriteData = req.body;
 
@@ -396,7 +510,7 @@ async function run() {
 
     // get all reports
 
-    app.get("/api/admin/reports", async (req, res) => {
+    app.get("/api/admin/reports",verifyToken,adminVerify, async (req, res) => {
       try {
         const result = await reportsCollection
           .find({})
@@ -574,7 +688,7 @@ async function run() {
     });
 
     // get User For admin
-    app.get("/api/manage_users", async (req, res) => {
+    app.get("/api/manage_users",verifyToken,adminVerify, async (req, res) => {
       try {
         const result = await usersCollection
           .find({})
@@ -647,7 +761,7 @@ async function run() {
       }
     });
 
-    app.get("/api/dashboard/stats/:userId", async (req, res) => {
+    app.get("/api/dashboard/stats/:userId",verifyToken ,userVerify, async (req, res) => {
       try {
         const { userId } = req.params;
 
@@ -751,7 +865,7 @@ async function run() {
     });
 
     // All Transition for Admin
-    app.get("/api/admin/transactions", async (req, res) => {
+    app.get("/api/admin/transactions",verifyToken,adminVerify, async (req, res) => {
       try {
         // Subscription Payments
         const subscriptions = await subscriptionsCollection.find({}).toArray();
@@ -818,8 +932,7 @@ async function run() {
     // Admin Dashboard
     app.get(
       "/api/admin/dashboard",
-      verifyToken,
-      adminVerify,
+      verifyToken,adminVerify,
       async (req, res) => {
         try {
           const totalUsers = await usersCollection.countDocuments();
